@@ -1,0 +1,77 @@
+name: Deploy OmniRAG API
+
+on:
+  workflow_run:
+    workflows:
+      - CI OmniRAG API
+    branches:
+      - main
+    types:
+      - completed
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: 8.0.x
+  PROJECT_PATH: backend/src/OmniRAG.Api/OmniRAG.Api.csproj
+  PUBLISH_DIR: backend/src/OmniRAG.Api/publish
+  PACKAGE_PATH: backend/src/OmniRAG.Api/publish.zip
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ${{ env.PUBLISH_DIR }} --no-restore
+
+      - name: Create deployment package
+        working-directory: ${{ env.PUBLISH_DIR }}
+        run: zip -r ../publish.zip .
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Azure infrastructure
+        run: |
+          az deployment group create \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --template-file backend/infra/omnirag-api.bicep \
+            --parameters \
+              appName="${{ secrets.AZURE_WEBAPP_NAME }}" \
+              appServicePlanName="${{ secrets.AZURE_APP_SERVICE_PLAN_NAME }}" \
+              location="${{ secrets.AZURE_LOCATION }}" \
+              keyVaultUri="${{ secrets.AZURE_KEYVAULT_URI }}" \
+              storageContainerName="${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}" \
+              openAiEndpoint="${{ secrets.AZURE_OPENAI_ENDPOINT }}" \
+              openAiChatDeploymentName="${{ secrets.AZURE_OPENAI_CHAT_DEPLOYMENT_NAME }}" \
+              openAiEmbeddingDeploymentName="${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME }}"
+
+      - name: Deploy API package
+        run: |
+          az webapp deploy \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ secrets.AZURE_WEBAPP_NAME }}" \
+            --src-path "${{ env.PACKAGE_PATH }}" \
+            --type zip

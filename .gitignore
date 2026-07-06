@@ -1,0 +1,47 @@
+# Build outputs
+**/bin/
+**/obj/
+**/dist/
+**/out/
+**/coverage/
+**/tmp/
+**/temp/
+**/.angular/
+**/.sass-cache/
+
+# Node / Angular
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# .NET / Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.psess
+*.vsp
+*.vspx
+TestResults/
+artifacts/
+
+# IDEs and editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.idea/
+.history/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.43.8.12551",
+      "templateHash": "8005295586136175802"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "appName": {
+      "type": "string"
+    },
+    "appServicePlanName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-plan', parameters('appName'))]"
+    },
+    "keyVaultUri": {
+      "type": "string"
+    },
+    "storageContainerName": {
+      "type": "string",
+      "defaultValue": "documents"
+    },
+    "openAiEndpoint": {
+      "type": "string"
+    },
+    "openAiChatDeploymentName": {
+      "type": "string",
+      "defaultValue": "YOUR-CHAT-DEPLOYMENT-NAME"
+    },
+    "openAiEmbeddingDeploymentName": {
+      "type": "string",
+      "defaultValue": "YOUR-EMBEDDING-DEPLOYMENT-NAME"
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {}
+    },
+    "skuName": {
+      "type": "string",
+      "defaultValue": "B1"
+    },
+    "skuCapacity": {
+      "type": "int",
+      "defaultValue": 1
+    }
+  },
+  "variables": {
+    "linuxFxVersion": "DOTNETCORE|8.0"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "sku": {
+        "name": "[parameters('skuName')]",
+        "tier": "Basic",
+        "capacity": "[parameters('skuCapacity')]"
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[parameters('appName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "kind": "app,linux",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "[variables('linuxFxVersion')]",
+          "alwaysOn": true
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites/config",
+      "apiVersion": "2023-12-01",
+      "name": "[format('{0}/{1}', parameters('appName'), 'appsettings')]",
+      "properties": {
+        "ASPNETCORE_ENVIRONMENT": "Production",
+        "WEBSITE_RUN_FROM_PACKAGE": "1",
+        "WEBSITES_ENABLE_APP_SERVICE_STORAGE": "false",
+        "Azure__KeyVaultUri": "[parameters('keyVaultUri')]",
+        "Azure__Storage__ContainerName": "[parameters('storageContainerName')]",
+        "Azure__OpenAI__Endpoint": "[parameters('openAiEndpoint')]",
+        "Azure__OpenAI__ChatDeploymentName": "[parameters('openAiChatDeploymentName')]",
+        "Azure__OpenAI__EmbeddingDeploymentName": "[parameters('openAiEmbeddingDeploymentName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('appName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "appServiceName": {
+      "type": "string",
+      "value": "[parameters('appName')]"
+    },
+    "defaultHostName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('appName')), '2023-12-01').defaultHostName]"
+    },
+    "appServiceUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('appName')), '2023-12-01').defaultHostName)]"
+    }
+  }
+}
