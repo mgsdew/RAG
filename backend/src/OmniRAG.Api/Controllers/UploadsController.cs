@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Cosmos;
 using OmniRAG.Api.Models;
 using OmniRAG.Application.Abstractions;
 using OmniRAG.Application.Dtos;
@@ -6,87 +8,135 @@ using OmniRAG.Domain.Entities;
 
 namespace OmniRAG.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/uploads")]
-public sealed class UploadsController : ControllerBase
+public class UploadsController : ControllerBase
 {
-    private readonly IUploadService _uploadService;
+ //   private readonly IUploadService _uploadService;
 
-    public UploadsController(IUploadService uploadService)
+    private readonly RagSqlDbContext _dbContext;
+    private readonly Container _cosmosContainer;
+
+    public UploadsController(RagSqlDbContext dbContext, Container cosmosContainer)
     {
-        _uploadService = uploadService;
+      //  _uploadService = uploadService;
+        _dbContext = dbContext;
+        _cosmosContainer = cosmosContainer;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<UploadRecordDto>>> GetAll(CancellationToken cancellationToken)
+    [Authorize(Roles = "Document.Uploader")]
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadDocument(IFormFile file)
     {
-        var records = await _uploadService.GetAllAsync(cancellationToken);
-        return Ok(records);
-    }
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided.");
 
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<UploadRecordDto>> GetById(Guid id, CancellationToken cancellationToken)
-    {
-        var record = await _uploadService.GetByIdAsync(id, cancellationToken);
-        return record is null ? NotFound() : Ok(record);
-    }
+        // 1. Generate unique identifier for the document tracking
+        var documentId = Guid.NewGuid().ToString();
 
-    [HttpPost]
-    [Consumes("multipart/form-data")]
-    public async Task<ActionResult<UploadRecordDto>> Create([FromForm] UploadCreateForm form, CancellationToken cancellationToken)
-    {
-        if (form.File.Length == 0)
+        // 2. Read file content safely as raw text
+        using var reader = new StreamReader(file.OpenReadStream());
+        var rawTextContent = await reader.ReadToEndAsync();
+
+        // 3. Save RAW content to NoSQL (Cosmos DB)
+        var cosmosItem = new
         {
-            return BadRequest("File is required.");
-        }
+            id = documentId,       // item unique id
+            documentId = documentId, // Partition Key mapping
+            fileName = file.FileName,
+            rawContent = rawTextContent,
+            chunked = false          // RAG pipeline state tracking
+        };
 
-        if (!UploadRecord.IsSupportedFileName(form.File.FileName))
+        await _cosmosContainer.CreateItemAsync(cosmosItem, new PartitionKey(documentId));
+
+        // 4. Save STRUCTURED relational metadata to Azure SQL
+        var metadata = new DocumentMetadata
         {
-            return BadRequest("Only CSV, XLS, and XLSX files are supported.");
-        }
+            DocumentId = documentId, 
+            FileName = file.FileName,
+            FileSizeInBytes = file.Length,
+            UploadedAt = DateTime.UtcNow + TimeSpan.FromHours(12),
+            UploadedBy = "LocalTestUser" // To be dynamically populated by OAuth2 later
+        };
 
-        var fileName = string.IsNullOrWhiteSpace(form.FileName)
-            ? Path.GetFileName(form.File.FileName)
-            : form.FileName.Trim();
+        _dbContext.DocumentMetadata.Add(metadata);
+        await _dbContext.SaveChangesAsync();
 
-        await using var fileStream = form.File.OpenReadStream();
-        var created = await _uploadService.CreateAsync(fileStream, fileName, form.File.ContentType ?? "application/octet-stream", form.UploadedAt, cancellationToken);
-
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        return Ok(new { Message = "Successfully processed and saved to hybrid data layers.", DocumentId = documentId });
     }
 
-    [HttpPut("{id:guid}")]
-    [Consumes("multipart/form-data")]
-    public async Task<ActionResult<UploadRecordDto>> Update(Guid id, [FromForm] UploadUpdateForm form, CancellationToken cancellationToken)
-    {
-        if (form.File is null && string.IsNullOrWhiteSpace(form.FileName) && string.IsNullOrWhiteSpace(form.ContentType) && form.UploadedAt is null)
-        {
-            return BadRequest("Provide at least one value to update.");
-        }
+    //[HttpGet]
+    //public async Task<ActionResult<IReadOnlyCollection<UploadRecordDto>>> GetAll(CancellationToken cancellationToken)
+    //{
+    //    var records = await _uploadService.GetAllAsync(cancellationToken);
+    //    return Ok(records);
+    //}
 
-        if (form.File is not null && form.File.Length > 0 && !UploadRecord.IsSupportedFileName(form.File.FileName))
-        {
-            return BadRequest("Only CSV, XLS, and XLSX files are supported.");
-        }
+    //[HttpGet("{id:guid}")]
+    //public async Task<ActionResult<UploadRecordDto>> GetById(Guid id, CancellationToken cancellationToken)
+    //{
+    //    var record = await _uploadService.GetByIdAsync(id, cancellationToken);
+    //    return record is null ? NotFound() : Ok(record);
+    //}
 
-        var fileName = form.File is not null && string.IsNullOrWhiteSpace(form.FileName)
-            ? Path.GetFileName(form.File.FileName)
-            : form.FileName;
+    //[HttpPost]
+    //[Consumes("multipart/form-data")]
+    //public async Task<ActionResult<UploadRecordDto>> Create([FromForm] UploadCreateForm form, CancellationToken cancellationToken)
+    //{
+    //    if (form.File.Length == 0)
+    //    {
+    //        return BadRequest("File is required.");
+    //    }
 
-        var contentType = form.File is not null && string.IsNullOrWhiteSpace(form.ContentType)
-            ? form.File.ContentType
-            : form.ContentType;
+    //    if (!UploadRecord.IsSupportedFileName(form.File.FileName))
+    //    {
+    //        return BadRequest("Only CSV, XLS, and XLSX files are supported.");
+    //    }
 
-        await using Stream? fileStream = form.File is null ? null : form.File.OpenReadStream();
-        var updated = await _uploadService.UpdateAsync(id, fileStream, fileName, contentType, form.UploadedAt, cancellationToken);
+    //    var fileName = string.IsNullOrWhiteSpace(form.FileName)
+    //        ? Path.GetFileName(form.File.FileName)
+    //        : form.FileName.Trim();
 
-        return updated is null ? NotFound() : Ok(updated);
-    }
+    //    await using var fileStream = form.File.OpenReadStream();
+    //    var created = await _uploadService.CreateAsync(fileStream, fileName, form.File.ContentType ?? "application/octet-stream", form.UploadedAt, cancellationToken);
 
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
-    {
-        var deleted = await _uploadService.DeleteAsync(id, cancellationToken);
-        return deleted ? NoContent() : NotFound();
-    }
+    //    return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+    //}
+
+    //[HttpPut("{id:guid}")]
+    //[Consumes("multipart/form-data")]
+    //public async Task<ActionResult<UploadRecordDto>> Update(Guid id, [FromForm] UploadUpdateForm form, CancellationToken cancellationToken)
+    //{
+    //    if (form.File is null && string.IsNullOrWhiteSpace(form.FileName) && string.IsNullOrWhiteSpace(form.ContentType) && form.UploadedAt is null)
+    //    {
+    //        return BadRequest("Provide at least one value to update.");
+    //    }
+
+    //    if (form.File is not null && form.File.Length > 0 && !UploadRecord.IsSupportedFileName(form.File.FileName))
+    //    {
+    //        return BadRequest("Only CSV, XLS, and XLSX files are supported.");
+    //    }
+
+    //    var fileName = form.File is not null && string.IsNullOrWhiteSpace(form.FileName)
+    //        ? Path.GetFileName(form.File.FileName)
+    //        : form.FileName;
+
+    //    var contentType = form.File is not null && string.IsNullOrWhiteSpace(form.ContentType)
+    //        ? form.File.ContentType
+    //        : form.ContentType;
+
+    //    await using Stream? fileStream = form.File is null ? null : form.File.OpenReadStream();
+    //    var updated = await _uploadService.UpdateAsync(id, fileStream, fileName, contentType, form.UploadedAt, cancellationToken);
+
+    //    return updated is null ? NotFound() : Ok(updated);
+    //}
+
+    //[HttpDelete("{id:guid}")]
+    //public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    //{
+    //    var deleted = await _uploadService.DeleteAsync(id, cancellationToken);
+    //    return deleted ? NoContent() : NotFound();
+    //}
 }
