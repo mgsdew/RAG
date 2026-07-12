@@ -1,38 +1,38 @@
+using Azure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Azure.Cosmos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using OmniRAG.Api.Models;
-using OmniRAG.Application.Abstractions;
-using OmniRAG.Application.Services;
-using OmniRAG.Infrastructure.Persistence;
-using OmniRAG.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var environment = builder.Environment.EnvironmentName;
-   
+
 builder.Configuration.SetBasePath(builder.Environment.ContentRootPath)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-builder.Services.AddCors(options =>
+var credential = new AzureCliCredential();
+
+// Load Vault Secrets into configuration provider on startup
+if (builder.Configuration.GetValue<bool>("Azure:UseKeyVault"))
 {
-    options.AddPolicy("Frontend", policy =>
+    var keyVaultName = builder.Configuration["Azure:KeyVaultName"];
+    if (!string.IsNullOrWhiteSpace(keyVaultName))
     {
-        policy.WithOrigins(
-                "http://localhost:4200",
-                "https://localhost:4200")    
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
+        var kvUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
+
+        // AzureCliCredential scans the Azure CLI for identities
+        builder.Configuration.AddAzureKeyVault(kvUri, credential);
+    }
+}
 
 // Register SQL Server Context
 builder.Services.AddDbContext<RagSqlDbContext>(options =>
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("SqlDb"),
+        builder.Configuration["Azure:ConnectionStrings:SqlDb"],
         sqlServerOptionsAction: sqlOptions =>
         {
             sqlOptions.EnableRetryOnFailure(
@@ -46,7 +46,7 @@ builder.Services.AddDbContext<RagSqlDbContext>(options =>
 builder.Services.AddSingleton<CosmosClient>(serviceProvider =>
 {
     var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-    var connectionString = configuration.GetConnectionString("CosmosDb");
+    var connectionString = configuration["Azure:ConnectionStrings:CosmosDb"];
     return new CosmosClient(connectionString);
 });
 
@@ -57,13 +57,13 @@ builder.Services.AddSingleton<Container>(serviceProvider =>
     var client = serviceProvider.GetRequiredService<CosmosClient>();
 
     // Pull settings safely right here
-    var databaseName = config["CosmosDbSettings:DatabaseName"];
-    var containerName = config["CosmosDbSettings:ContainerName"];
+    var databaseName = config["Azure:CosmosDbSettings:DatabaseName"];
+    var containerName = config["Azure:CosmosDbSettings:ContainerName"];
 
     if (string.IsNullOrEmpty(databaseName) || string.IsNullOrEmpty(containerName))
     {
         throw new InvalidOperationException(
-            "CosmosDB initialization failed. Ensure 'CosmosDbSettings:DatabaseName' and 'CosmosDbSettings:ContainerName' are populated in appsettings.json.");
+            "CosmosDB initialization failed. Ensure 'Azure:CosmosDbSettings:DatabaseName' and 'Azure:CosmosDbSettings:ContainerName' are populated in appsettings.json.");
     }
 
     return client.GetContainer(databaseName, containerName);
@@ -71,7 +71,7 @@ builder.Services.AddSingleton<Container>(serviceProvider =>
 
 // Add Microsoft Entra ID JWT bearer token authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("Azure:AzureAD"));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -79,6 +79,19 @@ builder.Services.AddSwaggerGen();
 //builder.Services.AddSingleton<IUploadRepository, InMemoryUploadRepository>();
 //builder.Services.AddSingleton<IUploadFileStorage>(_ => new LocalUploadFileStorage(Path.Combine(builder.Environment.ContentRootPath, "App_Data", "uploads")));
 //builder.Services.AddScoped<IUploadService, UploadService>();
+
+// Cross‑Origin Resource Sharing (CORS)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:4200",
+                "https://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
