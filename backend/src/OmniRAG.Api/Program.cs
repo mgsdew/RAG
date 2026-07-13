@@ -5,10 +5,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using OmniRAG.Api.Models;
+using OmniRAG.Infrastructure.Configuration;
+using OmniRAG.Infrastructure.Persistence;
 using System.IdentityModel.Tokens.Jwt;
 
-// CRITICAL: Stop .NET from remapping claims like 'roles' or 'sub' into legacy XML schemas
+// Stop .NET from remapping claims like 'roles' or 'sub' into legacy XML schemas
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -106,11 +107,13 @@ builder.Services.AddSingleton<CosmosClient>(serviceProvider =>
     return new CosmosClient(cosmosConnectionString);
 });
 
-// Register Container by pulling configuration dynamically inside the factory
-builder.Services.AddSingleton<Container>(serviceProvider =>
+// Bind Cosmos DB settings to typed configuration and register Container
+builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("CosmosDbSettings"));
+builder.Services.AddSingleton(serviceProvider =>
 {
     var client = serviceProvider.GetRequiredService<CosmosClient>();
-    return client.GetContainer(builder.Configuration["CosmosDbSettings:DatabaseName"], builder.Configuration["CosmosDbSettings:ContainerName"]);
+    var cfg = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<CosmosDbSettings>>().Value;
+    return client.GetContainer(cfg.DatabaseName, cfg.ContainerName);
 });
 
 
@@ -141,9 +144,8 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
-//builder.Services.AddSingleton<IUploadRepository, InMemoryUploadRepository>();
-//builder.Services.AddSingleton<IUploadFileStorage>(_ => new LocalUploadFileStorage(Path.Combine(builder.Environment.ContentRootPath, "App_Data", "uploads")));
-//builder.Services.AddScoped<IUploadService, UploadService>();
+// Register document service implementation
+builder.Services.AddScoped<OmniRAG.Application.Abstractions.IDocumentService, OmniRAG.Infrastructure.Services.DocumentService>();
 
 // Cross‑Origin Resource Sharing (CORS)
 builder.Services.AddCors(options =>

@@ -1,4 +1,4 @@
-﻿namespace OmniRAG.Api.Models
+namespace OmniRAG.Infrastructure.Configuration
 {
     public class CosmosDbSettings
     {
