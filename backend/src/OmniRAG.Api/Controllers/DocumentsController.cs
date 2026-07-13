@@ -10,15 +10,15 @@ namespace OmniRAG.Api.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/uploads")]
-public class UploadsController : ControllerBase
+[Route("api/Documents")]
+public class DocumentsController : ControllerBase
 {
  //   private readonly IUploadService _uploadService;
 
     private readonly RagSqlDbContext _dbContext;
     private readonly Container _cosmosContainer;
 
-    public UploadsController(RagSqlDbContext dbContext, Container cosmosContainer)
+    public DocumentsController(RagSqlDbContext dbContext, Container cosmosContainer)
     {
       //  _uploadService = uploadService;
         _dbContext = dbContext;

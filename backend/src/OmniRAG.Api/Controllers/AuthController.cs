@@ -20,11 +20,12 @@ namespace OmniRAG.Api.Controllers
         [HttpGet("dev-token")]
         public async Task<IActionResult> GetDevelopmentToken()
         {
-            var tenantId = _config["Azure:AzureAD:TenantId"];
-            var clientId = _config["Azure:AzureAD:ClientId"];
+            var tenantId = _config["AzureAD:TenantId"];
+            var clientId = _config["AzureAD:ClientId"];
+            var audience = _config["AzureAD:Audience"] ?? $"api://{clientId}";
 
             // Fetch Client Secret seamlessly from Key Vault at runtime!
-            var clientSecret = _config["Azure:AzureAD:ClientSecret"];
+            var clientSecret = _config["AzureAD:ClientSecret"];
 
             if (string.IsNullOrEmpty(clientSecret))
             {
@@ -37,7 +38,7 @@ namespace OmniRAG.Api.Controllers
             {
                 new KeyValuePair<string, string>("client_id", clientId!),
                 new KeyValuePair<string, string>("client_secret", clientSecret),
-                new KeyValuePair<string, string>("scope", $"{clientId}/.default"),
+                new KeyValuePair<string, string>("scope", $"{audience}/.default"),
                 new KeyValuePair<string, string>("grant_type", "client_credentials")
             });
 
