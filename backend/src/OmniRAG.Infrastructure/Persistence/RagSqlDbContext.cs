@@ -9,5 +9,6 @@ namespace OmniRAG.Infrastructure.Persistence
         }
 
         public DbSet<DocumentMetadata> DocumentMetadata { get; set; } = default!;
+        public DbSet<UserProfile> UserProfiles { get; set; } = default!;
     }
 }

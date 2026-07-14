@@ -146,6 +146,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 // Register document service implementation
 builder.Services.AddScoped<OmniRAG.Application.Abstractions.IDocumentService, OmniRAG.Infrastructure.Services.DocumentService>();
+// Register user service
+builder.Services.AddScoped<OmniRAG.Application.Abstractions.IUserService, OmniRAG.Infrastructure.Services.UserService>();
 
 // Cross‑Origin Resource Sharing (CORS)
 builder.Services.AddCors(options =>
