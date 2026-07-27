@@ -1,33 +1,64 @@
-import { Component, inject } from '@angular/core';
-import { RouterModule, Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { Component, DestroyRef, inject } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 import { AuthService } from './core/auth.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterModule, CommonModule],
-  templateUrl: './app.html',
-  styleUrls: ['./app.scss']
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  templateUrl: './app.html'
 })
 export class App {
-  private auth = inject(AuthService);
-  private router = inject(Router);
+  private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
 
-  get username() {
-    return this.auth.getUsername();
+  mobileMenuOpen = false;
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => {
+        this.mobileMenuOpen = false;
+      });
   }
 
-  get rolesText() {
-    return this.auth.getRolesText();
+  isAuthenticated(): boolean {
+    return this.authService.isAuthenticated();
   }
 
-  get isAuth() {
-    return this.auth.isAuthenticated();
+  isLoginRoute(): boolean {
+    return this.router.url.startsWith('/login');
   }
 
-  logout() {
-    this.auth.logout();
+  showShell(): boolean {
+    return this.isAuthenticated() && !this.isLoginRoute();
+  }
+
+  userEmail(): string {
+    return this.authService.getSignedInEmail();
+  }
+
+  userRole(): string {
+    return this.authService.getSignedInRole();
+  }
+
+  toggleMobileMenu(): void {
+    this.mobileMenuOpen = !this.mobileMenuOpen;
+  }
+
+  closeMobileMenu(): void {
+    this.mobileMenuOpen = false;
+  }
+
+  signOut(): void {
+    this.authService.logout();
+    this.closeMobileMenu();
     void this.router.navigate(['/login']);
   }
 }

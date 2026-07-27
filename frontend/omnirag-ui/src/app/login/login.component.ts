@@ -1,39 +1,24 @@
-import { NgOptimizedImage } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCard, MatCardActions, MatCardContent } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { Router } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { AuthService, LoginCredentials } from '../core/auth.service';
 
 @Component({
   selector: 'login-page',
   standalone: true,
-  imports: [
-    NgOptimizedImage,
-    MatCard,
-    MatCardActions,
-    MatCardContent,
-    MatButtonModule,
-    MatFormFieldModule,
-    MatInputModule,
-    ReactiveFormsModule,
-    MatIconModule
-  ],
+  imports: [ReactiveFormsModule],
   templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
 })
 export class LoginComponent {
   private readonly formBuilder = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly toastr = inject(ToastrService);
 
   readonly form = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
+    password: ['', [Validators.required, Validators.minLength(8)]]
   });
 
   isSubmitting = false;
@@ -55,10 +40,12 @@ export class LoginComponent {
 
     try {
       await this.auth.login(credentials);
+      this.toastr.success(`Signed in as ${email}`, 'Welcome back');
       await this.router.navigate(['/dashboard']);
     } catch (err) {
       console.error('Login failed', err);
       this.errorMessage = 'Login failed';
+      this.toastr.error('Unable to sign in. Please check your credentials.', 'Login failed');
     } finally {
       this.isSubmitting = false;
     }

@@ -1,70 +1,89 @@
-<form [formGroup]="form" (ngSubmit)="onSubmit()" class="p-4 max-w-7xl mx-auto">
-  <mat-card appearance="outlined">
-    <mat-card-content>
-      <div class="grid md:grid-cols-2 gap-6">
-        <div class="flex flex-col space-y-4 p-4">
-          <img
-            ngSrc="https://ui.angular-material.dev/app-ui/logo.svg"
-            alt="Logo"
-            height="48"
-            width="48"
-            class="inline" />
-          <h1 class="text-3xl">Sign in</h1>
-          <p>to continue to Application</p>
+<div class="min-h-[calc(100vh-6rem)] flex items-center justify-center px-4 py-8">
+  <div class="card w-full max-w-5xl overflow-hidden border border-base-300 bg-base-100 shadow-2xl">
+    <div class="grid md:grid-cols-2">
+      <section class="hidden flex-col justify-between bg-primary p-10 text-primary-content md:flex">
+        <div>
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-shield-halved text-3xl"></i>
+            <h1 class="text-3xl font-bold">OmniRAG</h1>
+          </div>
+          <p class="mt-4 max-w-sm text-primary-content/85">
+            Access to your dashboard, documents, and chatbot workspace.
+          </p>
         </div>
 
-        <div class="flex flex-col space-y-2 p-4 md:mt-12">
-          <mat-form-field class="w-full">
-            <mat-label>Email</mat-label>
-            <input matInput type="email" formControlName="email" />
-            @if (
-              (form.get('email')?.touched || form.get('email')?.dirty) &&
-              form.get('email')?.hasError('required')
-            ) {
-              <mat-error>
-                <mat-icon class="form-field-error-icon">error</mat-icon>
-                Email is required</mat-error
-              >
-            }
-            @if (
-              (form.get('email')?.touched || form.get('email')?.dirty) &&
-              form.get('email')?.hasError('email')
-            ) {
-              <mat-error>
-                <mat-icon class="form-field-error-icon">error</mat-icon>
-                Email is invalid
-              </mat-error>
-            }
-          </mat-form-field>
-          <mat-form-field class="w-full">
-            <mat-label>Password</mat-label>
-            <input matInput type="password" formControlName="password" />
-            @if (
-              (form.get('password')?.touched || form.get('password')?.dirty) &&
-              form.get('password')?.hasError('required')
-            ) {
-              <mat-error>
-                <mat-icon class="form-field-error-icon">error</mat-icon>
-                Password is required</mat-error
-              >
-            }
-            @if (
-              (form.get('password')?.touched || form.get('password')?.dirty) &&
-              form.get('password')?.hasError('minlength')
-            ) {
-              <mat-error>
-                <mat-icon class="form-field-error-icon">error</mat-icon>
-                Password must be at least 8 characters
-              </mat-error>
-            }
-          </mat-form-field>
+        <div class="text-sm text-primary-content/75">
+          A RAG (Retrieval-Augmented Generation) application that allows you to manage documents and interact with a chatbot powered by AI.
         </div>
-      </div>
-    </mat-card-content>
-    <mat-card-actions align="end">
-      <!-- <a matButton href="/register">Create account</a> -->
-      <a matButton>Forgot password?</a>
-      <button matButton="filled" type="submit">Sign in</button>
-    </mat-card-actions>
-  </mat-card>
-</form>
+      </section>
+
+      <section class="card-body p-8 md:p-10">
+        <div>
+          <h2 class="text-2xl font-semibold">Sign in</h2>
+          <p class="mt-2 text-base-content/70">Enter your email and password to continue.</p>
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="mt-6 space-y-4">
+          <label class="form-control w-full">
+            <div class="label">
+              <span class="label-text">Email</span>
+            </div>
+            <label class="input input-bordered flex items-center gap-2">
+              <i class="fa-solid fa-envelope text-base-content/50"></i>
+              <input class="grow" type="email" formControlName="email" placeholder="name@example.com" />
+            </label>
+            @if ((form.get('email')?.touched || form.get('email')?.dirty) && form.get('email')?.hasError('required')) {
+              <div class="label">
+                <span class="label-text-alt text-error">Email is required.</span>
+              </div>
+            }
+            @if ((form.get('email')?.touched || form.get('email')?.dirty) && form.get('email')?.hasError('email')) {
+              <div class="label">
+                <span class="label-text-alt text-error">Email is invalid.</span>
+              </div>
+            }
+          </label>
+
+          <label class="form-control w-full">
+            <div class="label">
+              <span class="label-text">Password</span>
+            </div>
+            <label class="input input-bordered flex items-center gap-2">
+              <i class="fa-solid fa-lock text-base-content/50"></i>
+              <input class="grow" type="password" formControlName="password" placeholder="Your password" />
+            </label>
+            @if ((form.get('password')?.touched || form.get('password')?.dirty) && form.get('password')?.hasError('required')) {
+              <div class="label">
+                <span class="label-text-alt text-error">Password is required.</span>
+              </div>
+            }
+            @if ((form.get('password')?.touched || form.get('password')?.dirty) && form.get('password')?.hasError('minlength')) {
+              <div class="label">
+                <span class="label-text-alt text-error">Password must be at least 8 characters.</span>
+              </div>
+            }
+          </label>
+
+          @if (errorMessage) {
+            <div class="alert alert-error">
+              <i class="fa-solid fa-circle-exclamation"></i>
+              <span>{{ errorMessage }}</span>
+            </div>
+          }
+
+          <div class="flex items-center justify-between gap-3 pt-2">
+            <a class="link link-hover text-sm" href="#">Forgot password?</a>
+            <button class="btn btn-primary min-w-32" type="submit" [disabled]="form.invalid || isSubmitting">
+              @if (isSubmitting) {
+                <span class="loading loading-spinner loading-sm"></span>
+                Signing in...
+              } @else {
+                <span>Sign in</span>
+              }
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>

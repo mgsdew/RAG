@@ -29,7 +29,7 @@ export class DocumentsComponent {
   auth = inject(AuthService);
 
   private selectedFile = signal<File|undefined>(undefined);
-  role: string = this.auth.getRolesText();
+  role: string = this.auth.getSignedInRole();
 
   get canUpload(): boolean {
     return this.role === 'Document.Uploader';
