@@ -1,0 +1,55 @@
+<div class="min-h-[calc(100vh-6rem)] bg-base-200 px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto flex w-full max-w-6xl items-center justify-center">
+        <div class="w-full overflow-hidden rounded-3xl border border-base-300 bg-base-100 shadow-2xl">
+            <div class="grid lg:grid-cols-[1.05fr_0.95fr]">
+                <section class="flex flex-col justify-between bg-gradient-to-br from-primary to-secondary p-8 text-primary-content sm:p-10 lg:p-12">
+                    <div>
+                        <span class="badge badge-outline border-primary-content/30 text-primary-content">Document document</span>
+                        <h1 class="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Upload and organize files</h1>
+                    </div>
+                </section>
+
+                <section class="p-6 sm:p-8 lg:p-10">
+                    <div class="space-y-6">
+                        <div>
+                            <h2 class="text-2xl font-semibold text-base-content">Upload document</h2>
+                        </div>
+
+                        @if (!canUpload) {
+                            <div class="alert alert-warning">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <span>You do not have permission to upload documents.</span>
+                            </div>
+                        }
+
+                        <fieldset class="rounded-2xl border border-base-300 bg-base-100 p-4 sm:p-6">
+                            <div class="space-y-4">
+                                <label class="form-control w-full">
+                                    <div class="label px-0">
+                                        <span class="label-text font-medium">Choose file</span>
+                                        <span class="label-text-alt text-base-content/60">Any supported document type</span>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        id="file"
+                                        class="file-input file-input-bordered w-full"
+                                        [disabled]="!canUpload"
+                                        (change)="onFile($event)"
+                                    />
+                                </label>
+
+                                <div class="rounded-xl bg-base-200 px-4 py-3 text-sm text-base-content/80">
+                                    Selected file: <span class="font-medium text-base-content">{{ currentFileName }}</span>
+                                </div>
+
+                                <button class="btn btn-primary w-full sm:w-auto" (click)="upload()" [disabled]="!canUpload || !currentFile">
+                                    Upload document
+                                </button>
+                            </div>
+                        </fieldset>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>

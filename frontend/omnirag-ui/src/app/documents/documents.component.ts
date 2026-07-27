@@ -1,28 +1,13 @@
 import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { UploadApiService } from '../core/upload-api.service';
 import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'documents-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
-  template: `
-    <h2>Document Management</h2>
-    <div *ngIf="!auth.isAuthenticated()">
-      <button (click)="login()">Login</button>
-    </div>
-
-    <div *ngIf="auth.isAuthenticated()">
-      <p>Logged in. Roles: {{ role }}</p>
-      <div *ngIf="profile">
-        <p>Welcome, {{ profile?.Profile?.Name ?? profile?.name ?? 'User' }}</p>
-      </div>
-      <input type="file" (change)="onFile($event)" />
-      <button (click)="upload()" [disabled]="!canUpload">Upload</button>
-    </div>
-  `
+  imports: [CommonModule],
+  templateUrl: './documents.component.html'
 })
 export class DocumentsComponent {
   private uploadApi = inject(UploadApiService);
@@ -33,6 +18,14 @@ export class DocumentsComponent {
 
   get canUpload(): boolean {
     return this.role === 'Document.Uploader';
+  }
+
+  get currentFile(): File | undefined {
+    return this.selectedFile();
+  }
+
+  get currentFileName(): string {
+    return this.currentFile?.name ?? 'No file selected';
   }
 
   get profile() {
